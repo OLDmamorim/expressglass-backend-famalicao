@@ -10,7 +10,7 @@ const corsHeaders = {
 // Função para conectar à base de dados
 async function connectDB() {
   const client = new Client({
-    connectionString: process.env.DATABASE_URL_FAMALICAO_FAMALICAO || process.env.DATABASE_URL_FAMALICAO,
+    connectionString: process.env.DATABASE_URL_FAMALICAO || process.env.DATABASE_URL,
     ssl: {
       rejectUnauthorized: false
     }
