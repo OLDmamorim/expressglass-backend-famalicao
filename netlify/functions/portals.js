@@ -42,8 +42,7 @@ exports.handler = async (event) => {
 
   try {
     // Verificar autenticação de admin
-    // TEMPORÁRIO: Desativado para testes em staging
-    // verifyAdmin(event);
+    verifyAdmin(event);
 
     // ---------- GET - Listar todos os portais ----------
     if (event.httpMethod === 'GET') {
