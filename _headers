@@ -1,0 +1,10 @@
+/.netlify/functions/*
+  Access-Control-Allow-Origin: *
+  Access-Control-Allow-Headers: Content-Type, Authorization, X-Portal-Id, X-Tenant-Id
+  Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS
+
+/api/*
+  Access-Control-Allow-Origin: *
+  Access-Control-Allow-Headers: Content-Type, Authorization, X-Portal-Id, X-Tenant-Id
+  Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS
+
