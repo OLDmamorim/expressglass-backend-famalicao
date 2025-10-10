@@ -156,22 +156,25 @@ exports.handler = async (event) => {
         return res(400, { error: 'Campos obrigatórios: date, period, plate' });
       }
 
+      // Determinar o portal_id a usar
+      let targetPortalId = portalId;
+      
       // Se for admin sem portal, requer portal_id no body
       if (portalId === null) {
         if (!body.portal_id) {
           return res(400, { error: 'Admin deve especificar portal_id' });
         }
-        portalId = body.portal_id;
+        targetPortalId = body.portal_id;
       }
 
       const { rows } = await client.query(
         `INSERT INTO appointments (date, period, plate, car, service, locality, notes, status, portal_id, created_at, updated_at)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW()) 
          RETURNING *`,
-        [date, period, plate, car, service, locality, notes, status || 'pending', portalId]
+        [date, period, plate, car, service, locality, notes, status || 'pending', targetPortalId]
       );
       
-      console.log(`✅ Agendamento criado: ID ${rows[0].id} (portal: ${portalId})`);
+      console.log(`✅ Agendamento criado: ID ${rows[0].id} (portal: ${targetPortalId})`);
       return res(201, rows[0]);
     }
 
