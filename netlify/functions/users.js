@@ -13,20 +13,37 @@ const JWT_SECRET = process.env.JWT_SECRET || 'expressglass-famalicao-secret-key-
 
 // Verificar se o utilizador é admin
 function verifyAdmin(event) {
-  const authHeader = event.headers.authorization || event.headers.Authorization;
-  
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    throw new Error('Não autenticado');
-  }
+  try {
+    const authHeader = event.headers.authorization || event.headers.Authorization;
+    
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      const error = new Error('Não autenticado - Token não fornecido');
+      error.statusCode = 401;
+      throw error;
+    }
 
-  const token = authHeader.substring(7);
-  const decoded = jwt.verify(token, JWT_SECRET);
-  
-  if (decoded.role !== 'admin') {
-    throw new Error('Acesso negado: apenas administradores');
+    const token = authHeader.substring(7);
+    
+    try {
+      const decoded = jwt.verify(token, JWT_SECRET);
+      
+      if (decoded.role !== 'admin') {
+        const error = new Error('Acesso negado: apenas administradores');
+        error.statusCode = 403;
+        throw error;
+      }
+      
+      return decoded;
+    } catch (jwtError) {
+      console.error('Erro ao verificar JWT:', jwtError.message);
+      const error = new Error('Token inválido ou expirado');
+      error.statusCode = 401;
+      throw error;
+    }
+  } catch (error) {
+    error.statusCode = error.statusCode || 401;
+    throw error;
   }
-  
-  return decoded;
 }
 
 exports.handler = async (event) => {
