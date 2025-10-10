@@ -143,7 +143,7 @@ exports.handler = async (event) => {
 
       const whereClause = where.length > 0 ? `WHERE ${where.join(' AND ')}` : '';
       
-      const sql = `SELECT id, date, period, plate, car, service, locality, notes, status, portal_id, calibragem, created_at, updated_at
+      const sql = `SELECT id, date, period, plate, car, service, locality, notes, status, portal_id, created_at, updated_at
                    FROM appointments
                    ${whereClause}
                    ORDER BY date NULLS LAST, period, id DESC`;
