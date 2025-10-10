@@ -194,11 +194,13 @@ exports.handler = async (event) => {
         targetPortalId = body.portal_id;
       }
 
+      const calibragem = body.calibragem || false;
+      
       const { rows } = await client.query(
-        `INSERT INTO appointments (date, period, plate, car, service, locality, notes, status, portal_id, created_at, updated_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW()) 
+        `INSERT INTO appointments (date, period, plate, car, service, locality, notes, status, portal_id, calibragem, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW(), NOW()) 
          RETURNING *`,
-        [date, period, plate, car, service, locality, notes, status || 'pending', targetPortalId]
+        [date, period, plate, car, service, locality, notes, status || 'pending', targetPortalId, calibragem]
       );
       
       console.log(`✅ Agendamento criado: ID ${rows[0].id} (portal: ${targetPortalId})`);
@@ -208,7 +210,7 @@ exports.handler = async (event) => {
     // ====== PUT - Atualizar agendamento ======
     if (method === 'PUT' && id) {
       const body = JSON.parse(event.body || '{}');
-      const allowed = ['date', 'period', 'plate', 'car', 'service', 'locality', 'notes', 'status'];
+      const allowed = ['date', 'period', 'plate', 'car', 'service', 'locality', 'notes', 'status', 'calibragem'];
       const sets = [];
       const values = [];
       let i = 1;
