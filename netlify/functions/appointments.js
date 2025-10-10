@@ -1,4 +1,8 @@
 const { Client } = require('pg');
+const jwt = require('jsonwebtoken');
+
+// Chave secreta para JWT
+const JWT_SECRET = process.env.JWT_SECRET || 'expressglass-famalicao-secret-key-change-in-production';
 
 // ====== CORS ======
 const corsHeaders = {
@@ -16,34 +20,48 @@ function res(status, body) {
 }
 
 /**
- * Obtém o portal_id a partir dos headers ou do utilizador autenticado
+ * Obtém o portal_id do utilizador autenticado
  * Prioridade:
- * 1. Header X-Portal-Id (para testes e compatibilidade)
- * 2. Token JWT do utilizador (quando autenticação estiver ativa)
- * 3. Default: 1 (Famalicão)
+ * 1. Token JWT do utilizador (PRIORIDADE)
+ * 2. Header X-Portal-Id (fallback para testes)
+ * 3. Erro se nenhum método funcionar
  */
 function getPortalId(event) {
-  // Tentar obter do header X-Portal-Id
+  // 1. PRIORIDADE: Tentar obter do token JWT
+  const authHeader = event.headers.authorization || event.headers.Authorization;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    try {
+      const token = authHeader.substring(7);
+      const decoded = jwt.verify(token, JWT_SECRET);
+      
+      if (decoded.portalId) {
+        console.log(`✅ Portal ID obtido do JWT: ${decoded.portalId} (${decoded.username})`);
+        return decoded.portalId;
+      }
+      
+      // Se for admin (sem portal), retornar null para acesso global
+      if (decoded.role === 'admin' && !decoded.portalId) {
+        console.log(`✅ Admin detectado: ${decoded.username} (acesso global)`);
+        return null; // Admin vê todos os portais
+      }
+    } catch (error) {
+      console.warn('⚠️ Token JWT inválido:', error.message);
+      // Continua para tentar o header X-Portal-Id
+    }
+  }
+
+  // 2. FALLBACK: Tentar obter do header X-Portal-Id (para testes)
   const headerPortalId = event.headers['x-portal-id'] || event.headers['X-Portal-Id'];
   if (headerPortalId) {
     const portalId = parseInt(headerPortalId, 10);
     if (!isNaN(portalId) && portalId > 0) {
+      console.log(`⚠️ Portal ID obtido do header (fallback): ${portalId}`);
       return portalId;
     }
   }
 
-  // TODO: Quando autenticação estiver ativa, obter do token JWT
-  // const authHeader = event.headers.authorization || event.headers.Authorization;
-  // if (authHeader && authHeader.startsWith('Bearer ')) {
-  //   const token = authHeader.substring(7);
-  //   const decoded = jwt.verify(token, process.env.JWT_SECRET);
-  //   if (decoded.portal_id) {
-  //     return decoded.portal_id;
-  //   }
-  // }
-
-  // Default: Portal Famalicão (id = 1)
-  return 1;
+  // 3. ERRO: Nenhum método funcionou
+  throw new Error('Portal não identificado. Faça login ou forneça X-Portal-Id header.');
 }
 
 async function connectDB() {
@@ -65,10 +83,13 @@ exports.handler = async (event) => {
     return { statusCode: 200, headers: corsHeaders, body: 'OK' };
   }
 
-  const portalId = getPortalId(event);
+  let portalId;
   let client;
   
   try {
+    // Obter portal_id (do JWT ou header)
+    portalId = getPortalId(event);
+    
     client = await connectDB();
 
     const method = event.httpMethod;
@@ -78,30 +99,48 @@ exports.handler = async (event) => {
     // ====== GET ALL - Listar agendamentos do portal ======
     if (method === 'GET' && !id) {
       const { from, to, period, status } = qs;
-      const where = ['portal_id = $1'];
-      const values = [portalId];
-      let i = 2;
+      const where = [];
+      const values = [];
+      let i = 1;
+
+      // Se portalId for null (admin), não filtra por portal
+      if (portalId !== null) {
+        where.push(`portal_id = $${i++}`);
+        values.push(portalId);
+      }
 
       if (from)   { where.push(`date >= $${i++}`); values.push(from); }
       if (to)     { where.push(`date <= $${i++}`); values.push(to); }
       if (period) { where.push(`period = $${i++}`); values.push(period); }
       if (status) { where.push(`status = $${i++}`); values.push(status); }
 
+      const whereClause = where.length > 0 ? `WHERE ${where.join(' AND ')}` : '';
+      
       const sql = `SELECT id, date, period, plate, car, service, locality, notes, status, portal_id, created_at, updated_at
                    FROM appointments
-                   WHERE ${where.join(' AND ')}
+                   ${whereClause}
                    ORDER BY date NULLS LAST, period, id DESC`;
       
       const { rows } = await client.query(sql, values);
+      console.log(`📊 Retornados ${rows.length} agendamentos (portal: ${portalId || 'todos'})`);
       return res(200, rows);
     }
 
     // ====== GET ONE - Obter agendamento específico ======
     if (method === 'GET' && id) {
+      const where = ['id = $1'];
+      const values = [id];
+      
+      if (portalId !== null) {
+        where.push('portal_id = $2');
+        values.push(portalId);
+      }
+      
       const { rows } = await client.query(
-        `SELECT * FROM appointments WHERE id = $1 AND portal_id = $2`,
-        [id, portalId]
+        `SELECT * FROM appointments WHERE ${where.join(' AND ')}`,
+        values
       );
+      
       if (!rows.length) return res(404, { error: 'Not found' });
       return res(200, rows[0]);
     }
@@ -117,6 +156,14 @@ exports.handler = async (event) => {
         return res(400, { error: 'Campos obrigatórios: date, period, plate' });
       }
 
+      // Se for admin sem portal, requer portal_id no body
+      if (portalId === null) {
+        if (!body.portal_id) {
+          return res(400, { error: 'Admin deve especificar portal_id' });
+        }
+        portalId = body.portal_id;
+      }
+
       const { rows } = await client.query(
         `INSERT INTO appointments (date, period, plate, car, service, locality, notes, status, portal_id, created_at, updated_at)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW()) 
@@ -124,6 +171,7 @@ exports.handler = async (event) => {
         [date, period, plate, car, service, locality, notes, status || 'pending', portalId]
       );
       
+      console.log(`✅ Agendamento criado: ID ${rows[0].id} (portal: ${portalId})`);
       return res(201, rows[0]);
     }
 
@@ -147,11 +195,17 @@ exports.handler = async (event) => {
       }
 
       sets.push(`updated_at = NOW()`);
-      values.push(id, portalId);
+      values.push(id);
+      
+      const where = [`id = $${i++}`];
+      if (portalId !== null) {
+        where.push(`portal_id = $${i++}`);
+        values.push(portalId);
+      }
       
       const sql = `UPDATE appointments 
                    SET ${sets.join(', ')} 
-                   WHERE id = $${i++} AND portal_id = $${i} 
+                   WHERE ${where.join(' AND ')}
                    RETURNING *`;
       
       const { rows } = await client.query(sql, values);
@@ -160,27 +214,37 @@ exports.handler = async (event) => {
         return res(404, { error: 'Not found or access denied' });
       }
       
+      console.log(`✅ Agendamento atualizado: ID ${id}`);
       return res(200, rows[0]);
     }
 
     // ====== DELETE - Eliminar agendamento ======
     if (method === 'DELETE' && id) {
+      const where = ['id = $1'];
+      const values = [id];
+      
+      if (portalId !== null) {
+        where.push('portal_id = $2');
+        values.push(portalId);
+      }
+      
       const { rowCount } = await client.query(
-        `DELETE FROM appointments WHERE id = $1 AND portal_id = $2`,
-        [id, portalId]
+        `DELETE FROM appointments WHERE ${where.join(' AND ')}`,
+        values
       );
       
       if (!rowCount) {
         return res(404, { error: 'Not found or access denied' });
       }
       
+      console.log(`✅ Agendamento eliminado: ID ${id}`);
       return res(204, {});
     }
 
     return res(405, { error: 'Method Not Allowed' });
     
   } catch (e) {
-    console.error('Error in appointments function:', e);
+    console.error('❌ Error in appointments function:', e);
     return res(500, { 
       error: 'Internal Server Error', 
       details: process.env.NODE_ENV === 'development' ? String(e) : undefined 
