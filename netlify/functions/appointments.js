@@ -27,12 +27,16 @@ function res(status, body) {
  * 3. Erro se nenhum método funcionar
  */
 function getPortalId(event) {
+  console.log('🔍 Tentando obter portal_id...');
+  console.log('Headers:', JSON.stringify(event.headers, null, 2));
+  
   // 1. PRIORIDADE: Tentar obter do token JWT
   const authHeader = event.headers.authorization || event.headers.Authorization;
   if (authHeader && authHeader.startsWith('Bearer ')) {
     try {
       const token = authHeader.substring(7);
       const decoded = jwt.verify(token, JWT_SECRET);
+      console.log('🔓 Token decodificado:', JSON.stringify(decoded, null, 2));
       
       if (decoded.portalId) {
         console.log(`✅ Portal ID obtido do JWT: ${decoded.portalId} (${decoded.username})`);
@@ -44,10 +48,14 @@ function getPortalId(event) {
         console.log(`✅ Admin detectado: ${decoded.username} (acesso global)`);
         return null; // Admin vê todos os portais
       }
+      
+      console.warn('⚠️ Token JWT válido mas sem portalId');
     } catch (error) {
       console.warn('⚠️ Token JWT inválido:', error.message);
       // Continua para tentar o header X-Portal-Id
     }
+  } else {
+    console.log('⚠️ Nenhum token JWT encontrado no header Authorization');
   }
 
   // 2. FALLBACK: Tentar obter do header X-Portal-Id (para testes)
@@ -61,6 +69,7 @@ function getPortalId(event) {
   }
 
   // 3. ERRO: Nenhum método funcionou
+  console.error('❌ Nenhum método de identificação de portal funcionou');
   throw new Error('Portal não identificado. Faça login ou forneça X-Portal-Id header.');
 }
 
