@@ -7,7 +7,7 @@ const JWT_SECRET = process.env.JWT_SECRET || 'expressglass-famalicao-secret-key-
 // ====== CORS ======
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Portal-Id',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Portal-Id, X-Tenant-Id',
   'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
 };
 
@@ -63,12 +63,30 @@ function getPortalId(event) {
   if (headerPortalId) {
     const portalId = parseInt(headerPortalId, 10);
     if (!isNaN(portalId) && portalId > 0) {
-      console.log(`⚠️ Portal ID obtido do header (fallback): ${portalId}`);
+      console.log(`⚠️ Portal ID obtido do header X-Portal-Id (fallback): ${portalId}`);
       return portalId;
     }
   }
 
-  // 3. ERRO: Nenhum método funcionou
+  // 3. FALLBACK LEGADO: Tentar obter do header X-Tenant-Id (compatibilidade com código antigo)
+  const tenantId = event.headers['x-tenant-id'] || event.headers['X-Tenant-Id'];
+  if (tenantId) {
+    // Mapear tenant name para portal_id
+    const tenantMap = {
+      'famalicao': 1,
+      'braga': 2,
+      'vilaverde': 3,
+      'vila-verde': 3
+    };
+    
+    const mappedPortalId = tenantMap[tenantId.toLowerCase()];
+    if (mappedPortalId) {
+      console.log(`⚠️ Portal ID obtido do header X-Tenant-Id (legado): ${tenantId} -> ${mappedPortalId}`);
+      return mappedPortalId;
+    }
+  }
+
+  // 4. ERRO: Nenhum método funcionou
   console.error('❌ Nenhum método de identificação de portal funcionou');
   throw new Error('Portal não identificado. Faça login ou forneça X-Portal-Id header.');
 }
