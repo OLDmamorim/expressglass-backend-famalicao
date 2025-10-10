@@ -12,14 +12,14 @@
   for = "/api/*"
   [headers.values]
     Access-Control-Allow-Origin = "*"
-    Access-Control-Allow-Headers = "Content-Type, Authorization"
+    Access-Control-Allow-Headers = "Content-Type, Authorization, X-Portal-Id, X-Tenant-Id"
     Access-Control-Allow-Methods = "GET, POST, PUT, DELETE, OPTIONS"
 
 [[headers]]
   for = "/.netlify/functions/*"
   [headers.values]
     Access-Control-Allow-Origin = "*"
-    Access-Control-Allow-Headers = "Content-Type, Authorization"
+    Access-Control-Allow-Headers = "Content-Type, Authorization, X-Portal-Id, X-Tenant-Id"
     Access-Control-Allow-Methods = "GET, POST, PUT, DELETE, OPTIONS"
 
 [[redirects]]
