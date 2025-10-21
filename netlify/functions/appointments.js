@@ -277,9 +277,11 @@ exports.handler = async (event) => {
     
   } catch (e) {
     console.error('❌ Error in appointments function:', e);
+    console.error('Stack trace:', e.stack);
     return res(500, { 
       error: 'Internal Server Error', 
-      details: process.env.NODE_ENV === 'development' ? String(e) : undefined 
+      message: e.message,
+      details: e.stack
     });
   } finally {
     if (client) {
