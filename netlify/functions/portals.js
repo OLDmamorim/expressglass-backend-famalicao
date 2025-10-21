@@ -223,9 +223,7 @@ exports.handler = async (event) => {
       headers,
       body: JSON.stringify({ 
         success: false, 
-        error: 'Erro interno do servidor',
-        details: error.message,
-        stack: error.stack
+        error: 'Erro interno do servidor'
       })
     };
   }
