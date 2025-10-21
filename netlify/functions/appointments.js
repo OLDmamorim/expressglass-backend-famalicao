@@ -32,9 +32,12 @@ function getPortalId(event) {
   
   // 1. PRIORIDADE: Tentar obter do token JWT
   const authHeader = event.headers.authorization || event.headers.Authorization;
+  console.log('Auth header:', authHeader ? 'EXISTS' : 'MISSING');
   if (authHeader && authHeader.startsWith('Bearer ')) {
     try {
       const token = authHeader.substring(7);
+      console.log('Token (first 20 chars):', token.substring(0, 20));
+      console.log('JWT_SECRET (first 10 chars):', JWT_SECRET.substring(0, 10));
       const decoded = jwt.verify(token, JWT_SECRET);
       console.log('🔓 Token decodificado:', JSON.stringify(decoded, null, 2));
       
